@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>九九クエスト</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night:#1C2448;
+    --window:#243063;
+    --gold:#F2C94C;
+    --paper:#FFF6DE;
+    --hp:#4ADE80;
+    --hurt:#F25F5C;
+    --sky:#7FB7E8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:"DotGothic16","Hiragino Kaku Gothic ProN",monospace;background:var(--night);color:var(--paper);
+    display:flex;justify-content:center}
+  .app{width:100%;max-width:440px;min-height:100%;padding:14px 12px 20px;display:flex;flex-direction:column}
+  .screen{display:none;flex:1;flex-direction:column}
+  .screen.on{display:flex}
+  button{font-family:inherit;color:inherit;cursor:pointer;border:none;background:none}
+  button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+  .win{background:var(--window);border:3px solid var(--paper);border-radius:8px;box-shadow:0 0 0 3px var(--night),0 0 0 5px var(--gold)}
+
+  /* ---------- マップ ---------- */
+  .logo{text-align:center;font-size:40px;color:var(--gold);letter-spacing:.06em;margin:6px 0 2px;
+    text-shadow:3px 3px 0 #8A5A00}
+  .logo-sub{text-align:center;font-size:14px;margin-bottom:16px;opacity:.85}
+  .status{display:flex;gap:12px;align-items:center;padding:10px 12px;margin:0 4px 18px}
+  .status svg{flex:0 0 64px}
+  .status .info{flex:1;font-size:15px;line-height:1.6}
+  .status .lv{font-size:22px;color:var(--gold)}
+  .expbar{height:8px;background:var(--night);border:1px solid var(--paper);margin-top:2px}
+  .expbar div{height:100%;background:var(--gold)}
+  .areas{display:flex;flex-direction:column;gap:10px;padding:0 4px}
+  .area{display:flex;align-items:center;gap:10px;padding:10px 12px;text-align:left;font-size:17px;width:100%}
+  .area .dan{flex:0 0 auto;background:var(--gold);color:var(--night);border-radius:4px;padding:3px 7px;font-size:14px}
+  .area .name{flex:1}
+  .area .mark{font-size:18px;color:var(--gold)}
+  .area:disabled{opacity:.4}
+  .area:not(:disabled):active{transform:translateY(2px)}
+  .area.final .dan{background:var(--hurt);color:var(--paper)}
+  .reset{margin:22px auto 0;font-size:12px;opacity:.5;text-decoration:underline}
+
+  /* ---------- バトル ---------- */
+  .bar-top{display:flex;justify-content:space-between;align-items:center;font-size:14px;margin-bottom:8px}
+  .flee{border:2px solid var(--paper);border-radius:6px;padding:3px 10px}
+  .scene{position:relative;height:210px;border-radius:8px;overflow:hidden;border:3px solid var(--paper)}
+  .scene .ground{position:absolute;left:0;right:0;bottom:0;height:62px}
+  .hero-box{position:absolute;left:14px;bottom:14px;width:92px}
+  .enemy-box{position:absolute;right:16px;top:30px;width:120px}
+  .enemy-box.boss{width:150px;top:14px;right:8px}
+  .hp{position:absolute;background:rgba(28,36,72,.85);border:2px solid var(--paper);border-radius:6px;padding:3px 8px;font-size:12px;min-width:120px}
+  .hp .g{height:7px;background:#111;margin-top:2px}
+  .hp .g div{height:100%;background:var(--hp);transition:width .3s}
+  .hp.hero{left:8px;top:8px}
+  .hp.enemy{right:8px;bottom:8px}
+  .hearts{color:var(--hurt);letter-spacing:1px;font-size:14px}
+  .dmg{position:absolute;font-size:30px;color:#fff;text-shadow:2px 2px 0 #000;pointer-events:none;animation:float .9s forwards}
+  .dmg.crit{color:var(--gold);font-size:36px}
+  .dmg.ouch{color:var(--hurt)}
+  @keyframes float{0%{opacity:0;transform:translateY(10px)}20%{opacity:1}100%{opacity:0;transform:translateY(-40px)}}
+  .lunge{animation:lunge .35s}
+  .hit{animation:hit .4s}
+  .enemy-attack{animation:eatk .35s}
+  .quake{animation:quake .35s}
+  .vanish{animation:vanish .6s forwards}
+  .appear{animation:appear .45s}
+  @keyframes lunge{50%{transform:translate(70px,-20px)}}
+  @keyframes hit{0%,100%{filter:none;transform:none}20%{filter:brightness(3);transform:translateX(8px)}60%{filter:brightness(3);transform:translateX(-6px)}}
+  @keyframes eatk{50%{transform:translate(-60px,20px) scale(1.1)}}
+  @keyframes quake{20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
+  @keyframes vanish{to{opacity:0;transform:scale(.4) translateY(20px);filter:brightness(4)}}
+  @keyframes appear{from{opacity:0;transform:scale(.6)}}
+
+  .msg{margin:12px 3px 0;padding:8px 12px;font-size:16px;min-height:44px;display:flex;align-items:center}
+  .qwin{margin:12px 3px;padding:8px 10px 10px;text-align:center;position:relative}
+  .timer{height:6px;background:var(--night);margin-bottom:6px}
+  .timer div{height:100%;background:var(--gold)}
+  .q{font-size:44px;line-height:1.1;white-space:nowrap}
+  .q .ans{display:inline-block;min-width:72px;border-bottom:4px solid var(--gold);color:var(--gold)}
+  .q .ans:empty::after{content:"?";opacity:.3}
+  .read{font-size:13px;opacity:.7;min-height:18px}
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:0 3px}
+  .key{height:52px;background:var(--paper);color:var(--night);border-radius:8px;font-size:26px;box-shadow:0 4px 0 #B8A77A}
+  .key:active{transform:translateY(4px);box-shadow:none}
+  .key.del{background:#C9D2F0;font-size:17px}
+  .key.go{background:var(--gold);font-size:19px;box-shadow:0 4px 0 #A07A10}
+
+  /* ---------- 結果 ---------- */
+  .result{align-items:center;text-align:center;padding-top:30px}
+  .result h2{font-size:34px;color:var(--gold);margin:14px 0 8px}
+  .result p{font-size:17px;line-height:1.7}
+  .result .win{width:100%;padding:12px;margin:18px 0}
+  .result .rows{display:flex;justify-content:space-around;font-size:14px}
+  .result .rows b{display:block;font-size:26px;color:var(--gold)}
+  .miss{font-size:15px;margin-top:10px;text-align:left;line-height:1.7}
+  .bigbtn{width:100%;padding:14px;font-size:20px;background:var(--gold);color:var(--night);border-radius:8px;margin-top:10px;box-shadow:0 4px 0 #A07A10}
+  .bigbtn.sub{background:var(--paper);box-shadow:0 4px 0 #B8A77A}
+  .lvup{color:var(--hp);font-size:20px}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  @media (max-height:680px){.scene{height:170px}.enemy-box{width:96px;top:24px}.enemy-box.boss{width:120px}.hero-box{width:76px}.q{font-size:36px}.key{height:46px}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- マップ -->
+  <section class="screen on" id="map">
+    <h1 class="logo">九九クエスト</h1>
+    <p class="logo-sub">九九の ちからで まものを たおせ！</p>
+    <div class="status win" id="status"></div>
+    <div class="areas" id="areas"></div>
+    <button class="reset" id="btnReset">ぼうけんの きろくを けす</button>
+  </section>
+
+  <!-- バトル -->
+  <section class="screen" id="battle">
+    <div class="bar-top">
+      <button class="flee" id="btnFlee">にげる</button>
+      <span id="areaName"></span>
+      <span id="foeCount"></span>
+    </div>
+    <div class="scene" id="scene">
+      <div class="ground" id="ground"></div>
+      <div class="hp hero"><span id="heroName">ゆうしゃ</span> <span class="hearts" id="heroHp"></span></div>
+      <div class="hero-box" id="hero"></div>
+      <div class="enemy-box" id="enemy"></div>
+      <div class="hp enemy"><span id="enemyName"></span><div class="g"><div id="enemyHp"></div></div></div>
+    </div>
+    <div class="msg win" id="msg"></div>
+    <div class="qwin win">
+      <div class="timer"><div id="timer"></div></div>
+      <div class="read" id="read"></div>
+      <div class="q"><span id="qtext"></span> <span class="ans" id="ans"></span></div>
+    </div>
+    <div class="pad" id="pad"></div>
+  </section>
+
+  <!-- 結果 -->
+  <section class="screen result" id="result">
+    <div id="resultArt"></div>
+    <h2 id="rTitle"></h2>
+    <p id="rText"></p>
+    <div class="win">
+      <div class="rows">
+        <div><b id="rCorrect"></b>せいかい</div>
+        <div><b id="rCrit"></b>かいしんの いちげき</div>
+        <div><b id="rLv"></b>レベル</div>
+      </div>
+      <div class="miss" id="rMiss"></div>
+    </div>
+    <button class="bigbtn" id="btnNext"></button>
+    <button class="bigbtn sub" id="btnMap">マップへ もどる</button>
+  </section>
+</div>
+
+<script>
+// ================= キャラクター絵 =================
+const EYES = (y=52, angry=true) => `
+  <circle cx="40" cy="${y}" r="6" fill="#fff"/><circle cx="60" cy="${y}" r="6" fill="#fff"/>
+  <circle cx="41" cy="${y+1}" r="3" fill="#1C2448"/><circle cx="59" cy="${y+1}" r="3" fill="#1C2448"/>
+  ${angry ? `<path d="M32 ${y-9} L46 ${y-5} M68 ${y-9} L54 ${y-5}" stroke="#1C2448" stroke-width="3.5" stroke-linecap="round"/>` : ''}`;
+const CROWN = `<path d="M34 14 L38 2 L44 10 L50 0 L56 10 L62 2 L66 14 Z" fill="#F2C94C" stroke="#1C2448" stroke-width="2.5" stroke-linejoin="round"/>`;
+const OUT = 'stroke="#1C2448" stroke-width="3" stroke-linejoin="round"';
+
+const SHAPES = {
+  mushroom: (c) => `
+    <path d="M36 58 L36 88 Q50 94 64 88 L64 58 Z" fill="#FFF3D6" ${OUT}/>
+    <path d="M10 60 Q10 18 50 18 Q90 18 90 60 Q50 68 10 60 Z" fill="${c}" ${OUT}/>
+    <circle cx="32" cy="36" r="6" fill="#fff" opacity=".85"/><circle cx="62" cy="30" r="5" fill="#fff" opacity=".85"/><circle cx="74" cy="48" r="4" fill="#fff" opacity=".85"/>
+    ${EYES(72)}<path d="M44 84 Q50 80 56 84" stroke="#1C2448" stroke-width="3" fill="none"/>`,
+  bat: (c) => `
+    <path d="M44 50 L6 30 L14 50 L4 60 L20 60 L26 72 L44 62 Z" fill="${c}" ${OUT}/>
+    <path d="M56 50 L94 30 L86 50 L96 60 L80 60 L74 72 L56 62 Z" fill="${c}" ${OUT}/>
+    <path d="M36 34 L40 20 L46 32 M64 34 L60 20 L54 32" fill="${c}" ${OUT}/>
+    <circle cx="50" cy="54" r="22" fill="${c}" ${OUT}/>
+    ${EYES(50)}<path d="M42 64 L58 64 M45 64 L47 70 L49 64 M51 64 L53 70 L55 64" stroke="#1C2448" stroke-width="2.5" fill="#fff"/>`,
+  rock: (c) => `
+    <path d="M14 86 L10 56 L24 28 L50 16 L78 26 L92 56 L86 86 Z" fill="${c}" ${OUT}/>
+    <path d="M24 40 L34 46 M70 36 L64 48 M22 72 L32 68" stroke="#1C2448" stroke-width="2.5" opacity=".5"/>
+    ${EYES(54)}<path d="M40 72 L60 72" stroke="#1C2448" stroke-width="4" stroke-linecap="round"/>`,
+  ghost: (c) => `
+    <path d="M18 88 L18 46 Q18 14 50 14 Q82 14 82 46 L82 88 L72 80 L62 90 L50 80 L38 90 L28 80 Z" fill="${c}" ${OUT}/>
+    <path d="M18 56 L4 44 M82 56 L96 44" stroke="#1C2448" stroke-width="3" stroke-linecap="round"/>
+    ${EYES(44)}<ellipse cx="50" cy="64" rx="7" ry="9" fill="#1C2448"/>`,
+  crab: (c) => `
+    <path d="M30 44 L30 26 M70 44 L70 26" stroke="#1C2448" stroke-width="3"/>
+    <circle cx="30" cy="24" r="7" fill="#fff" ${OUT}/><circle cx="70" cy="24" r="7" fill="#fff" ${OUT}/>
+    <circle cx="31" cy="25" r="3" fill="#1C2448"/><circle cx="69" cy="25" r="3" fill="#1C2448"/>
+    <path d="M18 60 Q4 50 8 36 Q14 44 22 40 Q16 30 20 26 Q30 36 26 56" fill="${c}" ${OUT}/>
+    <path d="M82 60 Q96 50 92 36 Q86 44 78 40 Q84 30 80 26 Q70 36 74 56" fill="${c}" ${OUT}/>
+    <path d="M22 76 L10 88 M30 80 L22 92 M78 76 L90 88 M70 80 L78 92" stroke="#1C2448" stroke-width="4" stroke-linecap="round"/>
+    <ellipse cx="50" cy="66" rx="32" ry="20" fill="${c}" ${OUT}/>
+    <path d="M40 70 Q50 64 60 70" stroke="#1C2448" stroke-width="3" fill="none"/>`,
+  knight: (c) => `
+    <path d="M26 90 L30 56 L70 56 L74 90 Z" fill="${c}" ${OUT}/>
+    <path d="M28 58 Q24 18 50 16 Q76 18 72 58 Z" fill="#9AA5C4" ${OUT}/>
+    <rect x="34" y="36" width="32" height="10" rx="3" fill="#1C2448"/>
+    <circle cx="42" cy="41" r="3" fill="#F25F5C"/><circle cx="58" cy="41" r="3" fill="#F25F5C"/>
+    <path d="M50 16 L50 4 Q60 8 62 16" fill="#F25F5C" ${OUT}/>
+    <path d="M84 20 L84 84" stroke="#1C2448" stroke-width="5"/><path d="M76 20 L92 20 L84 8 Z" fill="#9AA5C4" ${OUT}/>`,
+  dragon: (c) => `
+    <path d="M30 50 L4 22 L14 50 L2 58 L26 66 Z" fill="${c}" ${OUT} opacity=".9"/>
+    <path d="M70 50 L96 22 L86 50 L98 58 L74 66 Z" fill="${c}" ${OUT} opacity=".9"/>
+    <path d="M24 94 Q20 56 50 52 Q80 56 76 94 Z" fill="${c}" ${OUT}/>
+    <path d="M40 94 Q40 70 50 68 Q60 70 60 94 Z" fill="#FFE39A" ${OUT}/>
+    <path d="M26 44 Q24 18 50 18 Q76 18 74 44 Q74 60 50 60 Q26 60 26 44 Z" fill="${c}" ${OUT}/>
+    <path d="M32 24 L24 6 L40 20 M68 24 L76 6 L60 20" fill="#FFF6DE" ${OUT}/>
+    <circle cx="39" cy="36" r="6" fill="#F2C94C"/><circle cx="61" cy="36" r="6" fill="#F2C94C"/>
+    <rect x="37.5" y="31" width="3" height="10" fill="#1C2448"/><rect x="59.5" y="31" width="3" height="10" fill="#1C2448"/>
+    <path d="M36 50 Q50 58 64 50" stroke="#1C2448" stroke-width="3" fill="none"/>
+    <path d="M42 52 L44 57 L46 53 M54 53 L56 57 L58 52" fill="#fff" stroke="#1C2448" stroke-width="1.5"/>`
+};
+function enemySVG(shape, color, boss){
+  return `<svg viewBox="-4 -4 108 104" width="100%" aria-hidden="true">${SHAPES[shape](color)}${boss && shape!=='dragon' ? CROWN : ''}</svg>`;
+}
+function heroSVG(lv=1){
+  const cape = lv>=10 ? '#F2C94C' : lv>=5 ? '#9B5DE5' : '#F25F5C';
+  return `<svg viewBox="0 0 100 110" width="100%" aria-hidden="true">
+    <path d="M30 50 L14 96 L46 90 Z" fill="${cape}" ${OUT}/>
+    <path d="M32 96 L32 104 L44 104 L44 96 M56 96 L56 104 L68 104 L68 96" fill="#6B4A2B" ${OUT}/>
+    <path d="M30 56 Q30 48 50 48 Q70 48 70 56 L70 96 L30 96 Z" fill="#4C7BE0" ${OUT}/>
+    <path d="M30 76 L70 76" stroke="#F2C94C" stroke-width="5"/>
+    <circle cx="50" cy="32" r="20" fill="#FFD9B3" ${OUT}/>
+    <path d="M28 30 Q28 8 50 8 Q72 8 72 30 L66 24 L60 30 L54 22 L46 22 L40 30 L34 24 Z" fill="#8B5A2B" ${OUT}/>
+    <path d="M30 22 Q50 2 70 22" fill="none" stroke="#C9D2F0" stroke-width="6"/>
+    <circle cx="44" cy="34" r="3" fill="#1C2448"/><circle cx="58" cy="34" r="3" fill="#1C2448"/>
+    <path d="M46 42 Q51 46 56 42" stroke="#1C2448" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M70 70 L96 22" stroke="#E4ECFF" stroke-width="7" stroke-linecap="round"/>
+    <path d="M70 70 L96 22" stroke="#1C2448" stroke-width="1.5" opacity=".4"/>
+    <path d="M64 62 L78 74" stroke="#8A5A00" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="68" cy="72" r="5" fill="#F2C94C" ${OUT}/>
+    <path d="M22 60 L22 84 Q30 92 38 84 L38 60 Z" fill="#C9D2F0" ${OUT}/>
+    <path d="M30 64 L30 82 M24 72 L36 72" stroke="#F25F5C" stroke-width="3"/>
+  </svg>`;
+}
+
+// ================= エリア =================
+const AREAS = [
+  {dan:1, name:'はじまりの草原', sky:'#8FD3F4', ground:'#6CC06A',
+   foes:[['キノコン','mushroom','#F25F5C'],['キノコン','mushroom','#F28C5C'],['ぷちコウモリ','bat','#8C7AE6']], boss:['キノコン王','mushroom','#D6336C']},
+  {dan:2, name:'ささやきの森', sky:'#9CC9A4', ground:'#3E8E5A',
+   foes:[['もりキノコ','mushroom','#9B5DE5'],['コウモリン','bat','#6C5CE7'],['もりキノコ','mushroom','#7C3AED']], boss:['森のヌシ','mushroom','#5B21B6']},
+  {dan:3, name:'くらやみ洞くつ', sky:'#4A4E69', ground:'#22223B',
+   foes:[['コウモリン','bat','#6C5CE7'],['ゴロいわ','rock','#9A8C98'],['コウモリン','bat','#483D8B']], boss:['洞くつコウモリ王','bat','#2D1B69']},
+  {dan:4, name:'すなの いせき', sky:'#F6C177', ground:'#D4A15A',
+   foes:[['すなゴロ','rock','#E0B872'],['さばくガニ','crab','#E07A3C'],['すなゴロ','rock','#C99A52']], boss:['いせきの まもりいわ','rock','#A0763C']},
+  {dan:5, name:'こおりの 山', sky:'#CDE7F7', ground:'#EAF6FF',
+   foes:[['ひえひえオバケ','ghost','#A5D8FF'],['こおりいわ','rock','#8EC5E8'],['ひえひえオバケ','ghost','#74C0FC']], boss:['ふぶきの オバケ','ghost','#4DABF7']},
+  {dan:6, name:'ほのおの 火山', sky:'#F28C6B', ground:'#6B2B1F',
+   foes:[['マグマいわ','rock','#E8590C'],['ひのこウモリ','bat','#FA5252'],['マグマいわ','rock','#D9480F']], boss:['かざんの きょじん','rock','#C92A2A']},
+  {dan:7, name:'ゆうれい やしき', sky:'#5F4B8B', ground:'#3B2E5A',
+   foes:[['ふわオバケ','ghost','#E5DBFF'],['ふわオバケ','ghost','#D0BFFF'],['やしきコウモリ','bat','#5F3DC4']], boss:['やしきの あるじ','ghost','#B197FC']},
+  {dan:8, name:'あらしの 海', sky:'#5DA9E9', ground:'#1C6EA4',
+   foes:[['なみガニ','crab','#F76707'],['うみオバケ','ghost','#96F2D7'],['なみガニ','crab','#E8590C']], boss:['おおばさみガニ','crab','#C92A2A']},
+  {dan:9, name:'まおうの しろ', sky:'#3B2E5A', ground:'#4A4A68',
+   foes:[['やみの へい','knight','#5C5F66'],['しろの ガーゴイル','rock','#495057'],['やみの へい','knight','#343A40']], boss:['まおう クック','knight','#7048E8']},
+  {dan:0, name:'りゅうの とう（ぜんぶの だん）', sky:'#2B2D42', ground:'#8D99AE', final:true,
+   foes:[['やみの へい','knight','#343A40'],['ふぶきの オバケ','ghost','#4DABF7'],['かざんの きょじん','rock','#C92A2A']], boss:['でんせつの りゅう','dragon','#2F9E44']},
+];
+const FOE_HP = 3, BOSS_HP = 6, DRAGON_HP = 12;
+const TIME_LIMIT = 10000, CRIT_TIME = 3500;
+
+// ================= セーブ =================
+const SAVE_KEY = 'kuku-quest-v1';
+let save = {exp:0, cleared:0, kills:0};
+function loadSave(){ try{ const r = localStorage.getItem(SAVE_KEY); if(r) save = Object.assign(save, JSON.parse(r)); }catch(e){} }
+function writeSave(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }catch(e){} }
+const levelOf = (exp) => 1 + Math.floor(exp/5);
+const maxHpOf = (lv) => Math.min(10, 5 + Math.floor((lv-1)/3));
+
+// ================= 九九のよみ =================
+const R1 = ['','いん','に','さん','し','ご','ろく','しち','はち','く'];
+const R2 = ['','いち','に','さん','し','ご','ろく','しち','はち','く'];
+const reading = (a,b) => (b===1?R1[a]:R2[a]) + ' ' + R2[b] + (a*b<10?' が':'');
+
+// ================= マップ =================
+const $ = (id) => document.getElementById(id);
+function renderMap(){
+  const lv = levelOf(save.exp);
+  const into = save.exp % 5;
+  $('status').innerHTML = `${heroSVG(lv)}<div class="info">
+    <div class="lv">ゆうしゃ Lv.${lv}</div>
+    HP ${'♥'.repeat(maxHpOf(lv))}　たおした数 ${save.kills}
+    <div class="expbar"><div style="width:${into/5*100}%"></div></div>
+    <div style="font-size:12px;opacity:.8">つぎの レベルまで あと ${5-into}</div></div>`;
+  const box = $('areas');
+  box.innerHTML = '';
+  AREAS.forEach((a,i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'area win' + (a.final?' final':'');
+    const locked = i > save.cleared;
+    btn.disabled = locked;
+    btn.innerHTML = `<span class="dan">${a.final?'81もん':a.dan+'のだん'}</span>
+      <span class="name">${locked ? '？？？' : a.name}</span>
+      <span class="mark">${i < save.cleared ? '★' : locked ? '🔒' : '▶'}</span>`;
+    btn.onclick = () => startBattle(i);
+    box.appendChild(btn);
+  });
+}
+
+// ================= バトル =================
+let b = null;
+function startBattle(idx){
+  const area = AREAS[idx];
+  const lv = levelOf(save.exp);
+  const foes = area.foes.map(f=>({name:f[0], shape:f[1], color:f[2], hp:FOE_HP, boss:false}));
+  foes.push({name:area.boss[0], shape:area.boss[1], color:area.boss[2], hp: area.final?DRAGON_HP:BOSS_HP, boss:true});
+  b = {idx, area, foes, fi:0, heroHp:maxHpOf(lv), heroMax:maxHpOf(lv),
+       input:'', q:null, last:'', lock:true, qStart:0, raf:0,
+       correct:0, total:0, crit:0, misses:[], startLv:lv};
+  $('areaName').textContent = area.name;
+  $('scene').style.background = `linear-gradient(${area.sky}, ${area.sky})`;
+  $('ground').style.background = area.ground;
+  $('hero').innerHTML = heroSVG(lv);
+  show('battle');
+  drawHero();
+  spawn();
+}
+
+function spawn(){
+  const f = b.foes[b.fi];
+  f.max = f.hp;
+  const el = $('enemy');
+  el.className = 'enemy-box appear' + (f.boss ? ' boss' : '');
+  el.innerHTML = enemySVG(f.shape, f.color, f.boss);
+  $('enemyName').textContent = f.name;
+  $('foeCount').textContent = f.boss ? 'ボス' : `${b.fi+1} / ${b.foes.length-1}`;
+  drawEnemy();
+  say(f.boss ? `${f.name}が たちはだかった！` : `${f.name}が あらわれた！`);
+  $('qtext').textContent = ''; $('ans').textContent = ''; $('read').textContent = '';
+  setTimeout(nextQ, 1100);
+}
+
+function nextQ(){
+  let a, m, key;
+  do{
+    a = b.area.final ? 1+Math.floor(Math.random()*9) : b.area.dan;
+    m = 1+Math.floor(Math.random()*9);
+    key = a+'x'+m;
+  }while(key===b.last);
+  b.last = key; b.q = [a,m]; b.input=''; b.lock=false;
+  $('read').textContent = reading(a,m);
+  $('qtext').textContent = `${a} × ${m} =`;
+  $('ans').textContent = '';
+  say('こたえを いれて こうげきだ！');
+  b.qStart = Date.now();
+  cancelAnimationFrame(b.raf);
+  tick();
+}
+
+function tick(){
+  const left = Math.max(0, TIME_LIMIT-(Date.now()-b.qStart));
+  $('timer').style.width = (left/TIME_LIMIT*100)+'%';
+  $('timer').style.background = left<3000 ? 'var(--hurt)' : 'var(--gold)';
+  if(left<=0){ judge(true); return; }
+  b.raf = requestAnimationFrame(tick);
+}
+
+function press(k){
+  if(!b || b.lock) return;
+  if(k==='del') b.input = b.input.slice(0,-1);
+  else if(k==='go'){ if(b.input) judge(false); return; }
+  else if(b.input.length<2) b.input += k;
+  $('ans').textContent = b.input;
+  if(b.input.length === String(b.q[0]*b.q[1]).length) judge(false);
+}
+
+function judge(timeout){
+  b.lock = true;
+  cancelAnimationFrame(b.raf);
+  const [a,m] = b.q, right = a*m;
+  const ok = !timeout && Number(b.input)===right;
+  b.total++;
+  if(ok){
+    b.correct++;
+    const crit = Date.now()-b.qStart < CRIT_TIME;
+    if(crit) b.crit++;
+    const dmg = crit ? 2 : 1;
+    const f = b.foes[b.fi];
+    f.hp = Math.max(0, f.hp-dmg);
+    anim($('hero'),'lunge');
+    setTimeout(()=>{
+      anim($('enemy'),'hit');
+      popDmg($('enemy'), crit ? `${dmg}!!` : `${dmg}`, crit ? 'crit' : '');
+      drawEnemy();
+    },170);
+    say(crit ? 'かいしんの いちげき！' : `${f.name}に こうげき！`);
+    setTimeout(()=> f.hp<=0 ? defeat() : nextQ(), 900);
+  }else{
+    b.misses.push(`${a}×${m}=${right}`);
+    b.heroHp--;
+    say(`${timeout?'じかんぎれ！ ':''}こたえは ${right}。${b.foes[b.fi].name}の こうげき！`);
+    $('ans').textContent = right;
+    anim($('enemy'),'enemy-attack');
+    setTimeout(()=>{
+      anim($('scene'),'quake');
+      popDmg($('hero'),'-1','ouch');
+      drawHero();
+    },170);
+    setTimeout(()=> b.heroHp<=0 ? lose() : nextQ(), 1900);
+  }
+}
+
+function defeat(){
+  const f = b.foes[b.fi];
+  save.kills++;
+  save.exp += f.boss ? 3 : 1;
+  writeSave();
+  $('enemy').classList.add('vanish');
+  say(`${f.name}を たおした！`);
+  setTimeout(()=>{
+    b.fi++;
+    if(b.fi >= b.foes.length) win();
+    else spawn();
+  },1200);
+}
+
+function win(){
+  if(save.cleared === b.idx) save.cleared = Math.min(AREAS.length, b.idx+1);
+  writeSave();
+  const lv = levelOf(save.exp);
+  const last = b.idx === AREAS.length-1;
+  showResult({
+    art: heroSVG(lv),
+    title: last ? 'でんせつの ゆうしゃ！' : 'エリア クリア！',
+    text: last ? 'りゅうを たおして 九九を せいはした！' : `${b.area.name}を とりもどした！` +
+      (lv>b.startLv ? `<br><span class="lvup">レベルが ${lv}に あがった！</span>` : ''),
+    next: last ? 'もういちど ちょうせん' : (b.idx+1 < AREAS.length ? 'つぎの エリアへ' : 'もういちど'),
+    nextIdx: last ? b.idx : b.idx+1
+  });
+}
+
+function lose(){
+  const f = b.foes[b.fi];
+  showResult({
+    art: enemySVG(f.shape, f.color, f.boss),
+    title: 'やられてしまった…',
+    text: `${f.name}は つよかった。<br>まちがえた 九九を おぼえて リベンジだ！`,
+    next: 'もういちど たたかう',
+    nextIdx: b.idx
+  });
+}
+
+function showResult(r){
+  $('resultArt').innerHTML = `<div style="width:130px;margin:0 auto">${r.art}</div>`;
+  $('rTitle').textContent = r.title;
+  $('rText').innerHTML = r.text;
+  $('rCorrect').textContent = `${b.correct}/${b.total}`;
+  $('rCrit').textContent = b.crit;
+  $('rLv').textContent = levelOf(save.exp);
+  const miss = [...new Set(b.misses)];
+  $('rMiss').innerHTML = miss.length ? `おぼえよう：${miss.join('　')}` : 'ノーミス！ すばらしい！';
+  $('btnNext').textContent = r.next;
+  $('btnNext').onclick = () => startBattle(r.nextIdx);
+  show('result');
+}
+
+// ================= 表示ヘルパー =================
+function drawHero(){
+  $('heroHp').textContent = '♥'.repeat(Math.max(0,b.heroHp)) + '♡'.repeat(b.heroMax-Math.max(0,b.heroHp));
+}
+function drawEnemy(){
+  const f = b.foes[b.fi];
+  $('enemyHp').style.width = (f.hp/f.max*100)+'%';
+}
+function say(t){ $('msg').textContent = t; }
+function anim(el, cls){ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+function popDmg(target, text, cls){
+  const d = document.createElement('div');
+  d.className = 'dmg ' + cls;
+  d.textContent = text;
+  const s = $('scene').getBoundingClientRect(), t = target.getBoundingClientRect();
+  d.style.left = (t.left - s.left + t.width/2 - 14) + 'px';
+  d.style.top = (t.top - s.top + 10) + 'px';
+  $('scene').appendChild(d);
+  setTimeout(()=>d.remove(), 900);
+}
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id===id));
+  if(id==='map') renderMap();
+  window.scrollTo(0,0);
+}
+
+// ================= 操作 =================
+['1','2','3','4','5','6','7','8','9','del','0','go'].forEach(k=>{
+  const btn = document.createElement('button');
+  btn.className = 'key' + (k==='del'?' del':k==='go'?' go':'');
+  btn.textContent = k==='del' ? 'けす' : k==='go' ? 'OK' : k;
+  btn.addEventListener('click', ()=>press(k));
+  $('pad').appendChild(btn);
+});
+document.addEventListener('keydown', e=>{
+  if(!$('battle').classList.contains('on')) return;
+  if(/^[0-9]$/.test(e.key)) press(e.key);
+  else if(e.key==='Backspace') press('del');
+  else if(e.key==='Enter') press('go');
+});
+$('btnFlee').onclick = ()=>{ if(b) cancelAnimationFrame(b.raf); b=null; show('map'); };
+$('btnMap').onclick = ()=>show('map');
+$('btnReset').onclick = ()=>{
+  if(!confirm('ぼうけんの きろくを ぜんぶ けしますか？')) return;
+  save = {exp:0, cleared:0, kills:0};
+  try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+  renderMap();
+};
+
+loadSave();
+renderMap();
+</script>
+</body>
+</html>
